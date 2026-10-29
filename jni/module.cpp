@@ -20,7 +20,6 @@ using zygisk::AppSpecializeArgs;
 using zygisk::Option;
 
 namespace {
-
 using BuildProps = std::unordered_map<std::string, std::string>;
 using PackageMap = std::unordered_map<std::string, std::string>;
 
@@ -44,7 +43,6 @@ std::string strip_sub(const std::string &n) {
     auto c = n.find(':');
     return c == std::string::npos ? n : n.substr(0, c);
 }
-
 } // namespace
 
 class ZGameProps : public zygisk::ModuleBase {
@@ -52,7 +50,7 @@ public:
     void onLoad(Api *api, JNIEnv *env) override {
         api_ = api;
         env_ = env;
-        LOGI("Module loading into Zygote");
+        LOGI(">>> Module loaded into Zygote <<<");
         load_config();
     }
 
@@ -71,10 +69,12 @@ public:
         auto prof = profiles_.find(p->second);
         if (prof == profiles_.end()) { unload(); return; }
 
-        LOGI("Applying profile '%s' for %s", p->second.c_str(), pkg.c_str());
+        LOGI(">>> Matched target: %s (Profile: %s) <<<", pkg.c_str(), p->second.c_str());
 
+        LOGI("Step 1: Java Build fields...");
         applyBuildFields(env_, prof->second);
 
+        LOGI("Step 2: Native COW properties...");
         std::unordered_map<std::string, std::string> prop_overrides;
         for (const auto &kv : prof->second) {
             auto it = kFieldToProp.find(kv.first);
@@ -82,12 +82,13 @@ public:
                 prop_overrides[it->second] = kv.second;
         }
         if (!prop_overrides.empty()) {
-            if (cowApplyProperties(prop_overrides)) LOGI("COW properties applied");
-            else LOGE("COW properties failed");
+            if (!cowApplyProperties(prop_overrides)) LOGE("COW engine failed!");
         }
 
+        LOGI("Step 3: Mount isolation...");
         stealthHideMounts();
 
+        LOGI("Step 4: Unloading module.");
         unload();
     }
 
@@ -99,7 +100,7 @@ private:
 
     void load_config() {
         std::ifstream f(kConfigPath);
-        if (!f) { LOGE("Config file not found"); return; }
+        if (!f) { LOGE("Config file not found at %s", kConfigPath); return; }
 
         std::string line, section;
         BuildProps props;
@@ -116,21 +117,16 @@ private:
         while (std::getline(f, line)) {
             line = trim(line);
             if (line.empty() || line[0] == '#') continue;
-
             if (line.front() == '[' && line.back() == ']') {
                 commit();
                 section = line.substr(1, line.size() - 2);
-                if (section.rfind("profile.", 0) == 0)
-                    section = section.substr(8);
+                if (section.rfind("profile.", 0) == 0) section = section.substr(8);
                 continue;
             }
-
             auto eq = line.find('=');
             if (eq == std::string::npos) continue;
-
             auto k = trim(line.substr(0, eq));
             auto v = trim(line.substr(eq + 1));
-
             if (k == "packages") {
                 std::stringstream ss(v);
                 std::string item;
@@ -138,12 +134,12 @@ private:
                     item = trim(item);
                     if (!item.empty()) pkgs.push_back(item);
                 }
-            } else if (k == "BRAND" || k == "DEVICE" ||
-                       k == "MANUFACTURER" || k == "MODEL") {
+            } else if (k == "BRAND" || k == "DEVICE" || k == "MANUFACTURER" || k == "MODEL") {
                 props[k] = v;
             }
         }
         commit();
+        LOGI("Loaded %zu profiles, %zu packages", profiles_.size(), package_to_profile_.size());
     }
 
     void unload() {

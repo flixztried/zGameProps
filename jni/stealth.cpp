@@ -1,5 +1,4 @@
 #include "stealth.h"
-
 #include <cstring>
 #include <cstdlib>
 #include <unistd.h>
@@ -46,16 +45,21 @@ void stealthHideMounts() {
         }
         mi.close();
 
-        std::sort(targets.begin(), targets.end(),
-                  [](const std::string& a, const std::string& b) {
-                      return a.size() > b.size();
-                  });
+        std::sort(targets.begin(), targets.end(), [](const std::string& a, const std::string& b) {
+            return a.size() > b.size();
+        });
+
         for (auto& t : targets) {
-            if (umount2(t.c_str(), MNT_DETACH) == 0) unmounted++;
+            if (umount2(t.c_str(), MNT_DETACH) == 0) {
+                unmounted++;
+                LOGI("Mount: Unmounted %s", t.c_str());
+            } else {
+                LOGE("Mount: Failed to unmount %s", t.c_str());
+            }
         }
-        LOGI("Stealth: mount isolation SUCCESS (%d unmounted)", unmounted);
+        LOGI("Mount: Isolation complete (%d unmounted)", unmounted);
     } else {
-        LOGE("Stealth: mount isolation FAILED (unshare error %d)", errno);
+        LOGE("Mount: unshare(CLONE_NEWNS) failed (errno %d)", errno);
     }
 
     unsetenv("MAGISK_VER");
@@ -64,4 +68,5 @@ void stealthHideMounts() {
     unsetenv("KSU");
     unsetenv("KSU_VER");
     unsetenv("APATCH");
+    LOGI("Env: Root variables scrubbed");
 }
