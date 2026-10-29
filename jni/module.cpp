@@ -54,7 +54,6 @@ public:
         env_ = env;
         LOGI("Module loading into Zygote");
         load_config();
-        stealthInit(&module_base_, &module_size_);
     }
 
     void preAppSpecialize(AppSpecializeArgs *args) override {
@@ -97,8 +96,6 @@ private:
     JNIEnv *env_ = nullptr;
     std::unordered_map<std::string, BuildProps> profiles_;
     PackageMap package_to_profile_;
-    uintptr_t module_base_ = 0;
-    size_t    module_size_ = 0;
 
     void load_config() {
         std::ifstream f(kConfigPath);

@@ -10,13 +10,7 @@ else
     abort "! Zygisk Next, ReZygisk, or NeoZygisk required"
 fi
 
-SOINFO="❌soinfo"
-for linker in /system/bin/linker64 /system/bin/linker; do
-    if [ -f "$linker" ] && strings "$linker" 2>/dev/null | grep -q "remove_link_map"; then
-        SOINFO="✅soinfo"
-        break
-    fi
-done
+ZYGISK="✅zygisk"
 
 COW="❌cow"
 [ -f /dev/__properties__/properties_serial ] && COW="✅cow"
@@ -27,7 +21,7 @@ if unshare -m true >/dev/null 2>&1; then
     MOUNT="✅mount"
 fi
 
-DESC="[$SOINFO, $COW, $MOUNT] Minimal per-app Build spoof"
+DESC="[$ZYGISK, $COW, $MOUNT] Minimal per-app Build spoof"
 
 if [ -f "$MODPATH/module.prop" ]; then
     sed -i "s|^description=.*|description=$DESC|" "$MODPATH/module.prop"
