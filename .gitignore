@@ -1,0 +1,7 @@
+build/
+dist/
+*.zip
+jni/zygisk.hpp
+.vscode/
+.idea/
+*.py
