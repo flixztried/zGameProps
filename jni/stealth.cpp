@@ -11,7 +11,11 @@
 #include <sstream>
 #include <vector>
 #include <algorithm>
+#include <android/log.h>
 
+#define LOG_TAG "zGameProps"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 namespace {
 
@@ -26,15 +30,19 @@ bool resolve_linker() {
 
     void* linker = dlopen("linker64", RTLD_NOW | RTLD_NOLOAD);
     if (!linker) linker = dlopen("linker", RTLD_NOW | RTLD_NOLOAD);
-    if (!linker) return false;
+    if (!linker) { LOGE("Could not dlopen linker"); return false; }
 
     g_set_size = (set_size_fn)dlsym(linker, "_ZN6soinfo7setSizeEm");
     if (!g_set_size)
         g_set_size = (set_size_fn)dlsym(linker, "_ZN6soinfo12set_size_implEm");
+    
+    if (!g_set_size) LOGE("Failed to resolve set_size");
 
     g_remove_map = (remove_map_fn)dlsym(linker, "_ZL15remove_link_mapP6soinfo");
     if (!g_remove_map)
         g_remove_map = (remove_map_fn)dlsym(linker, "_ZN6soinfo15remove_link_mapEv");
+    
+    if (!g_remove_map) LOGE("Failed to resolve remove_link_map");
 
     dlclose(linker);
     return g_set_size && g_remove_map;
@@ -60,11 +68,17 @@ bool stealthInit(uintptr_t* base_out, size_t* size_out) {
     *base_out = 0;
     *size_out = 0;
 
-    if (!resolve_linker()) return false;
+    if (!resolve_linker()) {
+        LOGI("Stealth: soinfo hiding DISABLED (linker symbols missing)");
+        return false;
+    }
 
     find_ctx ctx{ "libzygisk.so", nullptr };
     dl_iterate_phdr(find_cb, &ctx);
-    if (!ctx.found) return false;
+    if (!ctx.found) {
+        LOGE("Could not find libzygisk.so in dl_iterate_phdr");
+        return false;
+    }
 
     void* si = ctx.found;
 
@@ -74,7 +88,7 @@ bool stealthInit(uintptr_t* base_out, size_t* size_out) {
 
     g_set_size(si, 0);
     g_remove_map(si);
-
+    LOGI("Stealth: soinfo hiding SUCCESS");
     return true;
 }
 
@@ -85,6 +99,7 @@ void stealthHideMounts() {
         std::vector<std::string> targets;
         std::ifstream mi("/proc/self/mountinfo");
         std::string line;
+        int unmounted = 0;
         while (std::getline(mi, line)) {
             std::vector<std::string> f;
             std::istringstream ss(line);
@@ -112,7 +127,12 @@ void stealthHideMounts() {
                   [](const std::string& a, const std::string& b) {
                       return a.size() > b.size();
                   });
-        for (auto& t : targets) umount2(t.c_str(), MNT_DETACH);
+        for (auto& t : targets) {
+            if (umount2(t.c_str(), MNT_DETACH) == 0) unmounted++;
+        }
+        LOGI("Stealth: mount isolation SUCCESS (%d unmounted)", unmounted);
+    } else {
+        LOGE("Stealth: mount isolation FAILED (unshare error %d)", errno);
     }
 
     unsetenv("MAGISK_VER");

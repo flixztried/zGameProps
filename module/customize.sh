@@ -21,7 +21,11 @@ done
 COW="❌cow"
 [ -f /dev/__properties__/properties_serial ] && COW="✅cow"
 
-MOUNT="✅mount"
+MOUNT="❌mount"
+# Test if unshare actually works in this environment
+if unshare -m true >/dev/null 2>&1; then
+    MOUNT="✅mount"
+fi
 
 DESC="[$SOINFO, $COW, $MOUNT] Minimal per-app Build spoof"
 

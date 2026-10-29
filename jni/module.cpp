@@ -4,11 +4,16 @@
 #include <unordered_map>
 #include <fstream>
 #include <sstream>
+#include <android/log.h>
 
 #include "zygisk.hpp"
 #include "gamesprops.h"
 #include "prophide.h"
 #include "stealth.h"
+
+#define LOG_TAG "zGameProps"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 using zygisk::Api;
 using zygisk::AppSpecializeArgs;
@@ -47,6 +52,7 @@ public:
     void onLoad(Api *api, JNIEnv *env) override {
         api_ = api;
         env_ = env;
+        LOGI("Module loading into Zygote");
         load_config();
         stealthInit(&module_base_, &module_size_);
     }
@@ -66,6 +72,8 @@ public:
         auto prof = profiles_.find(p->second);
         if (prof == profiles_.end()) { unload(); return; }
 
+        LOGI("Applying profile '%s' for %s", p->second.c_str(), pkg.c_str());
+
         applyBuildFields(env_, prof->second);
 
         std::unordered_map<std::string, std::string> prop_overrides;
@@ -74,8 +82,10 @@ public:
             if (it != kFieldToProp.end())
                 prop_overrides[it->second] = kv.second;
         }
-        if (!prop_overrides.empty())
-            cowApplyProperties(prop_overrides);
+        if (!prop_overrides.empty()) {
+            if (cowApplyProperties(prop_overrides)) LOGI("COW properties applied");
+            else LOGE("COW properties failed");
+        }
 
         stealthHideMounts();
 
@@ -92,7 +102,7 @@ private:
 
     void load_config() {
         std::ifstream f(kConfigPath);
-        if (!f) return;
+        if (!f) { LOGE("Config file not found"); return; }
 
         std::string line, section;
         BuildProps props;
