@@ -1,52 +1,30 @@
 # zGameProps
 
-Per-app Build field spoofing for Zygisk. Minimal by design: only 4 fields
-(`BRAND`, `DEVICE`, `MANUFACTURER`, `MODEL`) and their matching `ro.product.*`
-properties.
+Per-app Build field spoofing for Zygisk. 
+
+## v2.0.0-hotfix
+This is a hotfix release for v2.0.0. It removes the const-cast error in the memory scrubbing code, ensuring the module builds and unloads cleanly without native hooks.
+
+## Architecture
+The module operates exclusively at the Java layer. It modifies `Build.BRAND`, `Build.DEVICE`, `Build.MANUFACTURER`, and `Build.MODEL` via JNI before the app initializes, then immediately scrubs its memory and unloads.
+
+- **No Native Hooks**: There are no GOT/PLT hooks or syscall intercepts.
+- **No COW Engine**: There is no `mmap` over the property arena.
+- **No Mount Hiding**: There are no `unshare` or `umount2` calls.
+
+Because the game process is left 100% pristine of native tampering, it avoids anti-cheat memory scanners that flag modified memory maps or abnormal mount namespaces.
 
 ## Requirements
-
 - Zygisk Next, ReZygisk, or NeoZygisk
 - Magisk, KernelSU, or APatch
+- **KernelSU + SUSFS** (or a resetprop script) to spoof the native properties (`ro.product.model`, etc.) globally, as this module only touches the Java layer.
 
-Magisk built-in Zygisk is not supported.
-
-## Stealth layers
-
-| Layer | Mechanism |
-|---|---|
-| Linker hiding | `set_size(0)` -> `remove_link_map()` -> `DLCLOSE_MODULE_LIBRARY`. No address gap, no `soinfo` trace. |
-| COW properties | `mmap(MAP_PRIVATE \| MAP_FIXED)` over `/dev/__properties__`, overwrite `ro.product.*` in place. Covers native reads. No GOT/PLT hooks. |
-| Mount isolation | `unshare(CLONE_NEWNS)`, `MS_PRIVATE` recursion, unmount `/data/adb` traces. |
-| Env scrub | Unset Magisk, KSU, APatch environment variables. |
-
-All layers run per-process. The module unloads immediately after spoofing.
-The installer dynamically checks the device and updates the module description
-with `[✅soinfo, ✅cow, ✅mount]` to show which layers are active.
-
-## Note
-
-Do not enable Magisk's "Enforce DenyList". It blocks Zygisk modules from
-loading into denylisted apps. This module does its own hiding.
-
-## Config
-
-Profiles in `/data/adb/modules/zgameprops/config.conf`.
-
-## Build
-
-    export ANDROID_NDK_HOME=/path/to/ndk
-    ./build.sh
-
-Output: `dist/zGameProps.zip`.
+## Configuration
+Profiles are in `/data/adb/modules/zgameprops/config.conf`. 
 
 ## Credits
-
-- UN1CA — original GamesPropsUtils concept and profiles
-- Device Faker (Seyud) — COW property engine reference
-- ReZygisk / NeoZygisk — linker hiding reference
-- topjohnwu — zygisk.hpp
+- UN1CA - original GamesPropsUtils concept and profiles
+- topjohnwu - zygisk.hpp
 
 ## License
-
 GPL-3.0

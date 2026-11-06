@@ -13,7 +13,7 @@ ZYGISK="✅zygisk"
 JAVA="✅java"
 SERVER="✅sys_server"
 
-DESC="[$ZYGISK, $JAVA, $SERVER] COPG-style pure Java spoof"
+DESC="[$ZYGISK, $JAVA, $SERVER] Pure Java spoof (Zero native traces)"
 
 if [ -f "$MODPATH/module.prop" ]; then
     sed -i "s|^description=.*|description=$DESC|" "$MODPATH/module.prop"

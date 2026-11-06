@@ -42,7 +42,6 @@ void secure_zero(void* ptr, size_t len) {
 
 void scrub_map(std::unordered_map<std::string, std::string>& map) {
     for (auto& pair : map) {
-        // Use const_cast to bypass const restriction on map keys
         if (!pair.first.empty()) secure_zero(const_cast<char*>(pair.first.data()), pair.first.size());
         if (!pair.second.empty()) secure_zero(const_cast<char*>(pair.second.data()), pair.second.size());
     }
@@ -54,7 +53,7 @@ class ZGameProps : public zygisk::ModuleBase {
 public:
     void onLoad(Api *api, JNIEnv *env) override {
         api_ = api; env_ = env;
-        LOGI(">>> zGameProps v2.0.0 loaded <<<");
+        LOGI(">>> zGameProps v2.0.0-hotfix loaded <<<");
         load_config();
     }
 
