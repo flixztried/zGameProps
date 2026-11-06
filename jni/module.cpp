@@ -42,8 +42,9 @@ void secure_zero(void* ptr, size_t len) {
 
 void scrub_map(std::unordered_map<std::string, std::string>& map) {
     for (auto& pair : map) {
-        if (!pair.first.empty()) secure_zero(&pair.first[0], pair.first.size());
-        if (!pair.second.empty()) secure_zero(&pair.second[0], pair.second.size());
+        // Use const_cast to bypass const restriction on map keys
+        if (!pair.first.empty()) secure_zero(const_cast<char*>(pair.first.data()), pair.first.size());
+        if (!pair.second.empty()) secure_zero(const_cast<char*>(pair.second.data()), pair.second.size());
     }
     map.clear();
 }
@@ -57,8 +58,6 @@ public:
         load_config();
     }
 
-    // COPG-inspired System-Server Spoofing
-    // Inject into system_server to sanitize global environment, then leave.
     void preServerSpecialize(ServerSpecializeArgs *args) override {
         LOGI(">>> Injected into system_server (Sanitizing environment) <<<");
         api_->setOption(Option::DLCLOSE_MODULE_LIBRARY);
